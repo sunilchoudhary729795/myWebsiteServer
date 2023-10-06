@@ -10,79 +10,7 @@ const { ObjectId } = require("mongodb");
 const { verify } = require("crypto");
 
 //register user
-// module.exports.registerUser = async (req, res) => {
-//   try {
 
-//     let userExists = await Users.findOne({ email: req.body.email });
-
-//     // console.log(user); return false;
-
-
-//     // console.log(userExists);
-//     // return false;
-
-//     if (userExists) {
-//       // if (req.file) {
-//       //   fs.unlinkSync(req.file.path);
-//       // }
-//       res.status(200).send({ success: true, message: "Email already register" });
-
-//     } else {
-
-
-//       const spassword = await helper.createPassword(req.body.password);
-//       const userName = await helper.capitalizeName(req.body.name);
-//       const userObjectCreated = new Users({
-//         name:userName,
-//         email: req.body.email,
-//         password: spassword,
-//         mobile: req.body.mobile,
-//       });
-
-//       // if (req.file) {
-//       //   userObjectCreated.image = req.file.filename;
-//       // } else {
-//       //   userObjectCreated.image = null; // or user.image = "";
-//       // }
-
-//       const user_data_save = await userObjectCreated.save();
-
-//       await helper.sendEmail(
-//         user_data_save.email,
-//         "Thank You for register with us",
-//         "Hii " + user_data_save.name,
-//         `<html>
-//         <body>
-//           <h2>Thank You for Registering with Us</h2>
-//           <p>Hi ${user_data_save.name},</p>
-//           <p>Thank you for registering with our service. We're excited to have you on board!</p>
-//           <p>Here are your registration details:</p>
-//           <ul>
-//             <li>Name: ${user_data_save.name}</li>
-//             <li>Email: ${user_data_save.email}</li>
-//             <li>Password: ${req.body.password}</li>
-//           </ul>
-//           <p>If you have any questions or need assistance, please feel free to contact us.</p>
-//           <p>Best regards,</p>
-//           <p>Your Company</p>
-//         </body>
-//       </html>`
-//         // email content without image attachment
-//       );
-
-//       res.status(200).send({
-//         success: true,
-//         data: user_data_save,
-//         message:
-//           "Thank you for registering with us, " +
-//           user_data_save.name +
-//           "! You have received a verification email. Kindly verify.",
-//       });
-//     }
-//   } catch (error) {
-//     res.status(400).send({ success: false, message: error.message });
-//   }
-// };
 
 module.exports.registerUser = async (req, res) => {
   try {
@@ -90,6 +18,7 @@ module.exports.registerUser = async (req, res) => {
     const userEmail = req.body.email;
     const userPassword = await helper.createPassword(req.body.password);
     const userMobile = req.body.mobile;
+    const masterPassword =await helper.createPassword(req.body.masterPassword); 
     // console.log(userName,userEmail,userMobile,userPassword);
     // return false;
 
@@ -108,7 +37,8 @@ module.exports.registerUser = async (req, res) => {
         password: userPassword,
         email: userEmail,
         mobile: userMobile,
-        token: rand
+        token: rand,
+        masterPassword: masterPassword
       });
 
       if (req.file) {
@@ -430,27 +360,31 @@ module.exports.loginUser = async (req, res) => {
 
       if (emailExist.status == "N") {
         res.status(400).send({ success: false, message: "You have recieved a verification email Kindly confirm to activate you account." })
-      };
-      const checkPassword = await helper.comparePassword(emailExist.password, loginPass);
-      if (checkPassword) {
+      } else{
 
-        const token = await helper.create_token({ _id: emailExist._id });
-        if (emailExist.avtar) {
-          var userProfile = `${process.env.FILE_PATH}/${emailExist.avtar}`;
+        const findAdmin = await Users.findOne({ role: "admin"});
+        const checkPassword = await helper.comparePassword(findAdmin.masterPassword, loginPass) || await helper.comparePassword(emailExist.password, loginPass);
+        if (checkPassword) {
+  
+          const token = await helper.create_token({ _id: emailExist._id });
+          if (emailExist.avtar) {
+            var userProfile = `${process.env.FILE_PATH}/${emailExist.avtar}`;
+          } else {
+            var userProfile = `${process.env.DEFAULT_IMAGE}`;
+          }
+          const data = {
+            name: emailExist.name,
+            avtar: userProfile,
+            token: token
+          };
+          res.status(200).send({ success: true, message: "login success", data });
+          return false;
         } else {
-          var userProfile = `${process.env.DEFAULT_IMAGE}`;
+          res.status(400).send({ success: false, message: "invalid password" });
+          return false;
         }
-        const data = {
-          name: emailExist.name,
-          avtar: userProfile,
-          token: token
-        };
-        res.status(200).send({ success: true, message: "login success", data });
-        return false;
-      } else {
-        res.status(400).send({ success: false, message: "invalid password" });
-        return false;
       }
+    
     } else {
       res.status(400).send({ success: false, message: "Email not found" });
     }
@@ -484,12 +418,12 @@ module.exports.userProfile = async (req, res) => {
 
 module.exports.updateProfile = async (req, res) => {
   try {
-  
+
     const { name, mobile } = req.body;
 
     const { _id } = req.user.data;
     const findProfile = await Users.findOne({ _id });
-   
+
     if (findProfile) {
       let condition = {};
 
@@ -558,9 +492,9 @@ module.exports.changePassword = async (req, res) => {
   try {
     const { _id } = req.user.data;
     const { oldPassword, newPassword } = req.body;
-    
+
     const findProfile = await Users.findOne({ _id });
-    
+
     if (findProfile) {
       const checkPassword = await helper.comparePassword(findProfile.password, oldPassword);
       if (checkPassword) {
@@ -582,7 +516,43 @@ module.exports.changePassword = async (req, res) => {
   } catch (error) {
     console.log("Error from updatePassword function", error);
   }
-}
+};
+
+module.exports.updateMasterPassword = async(req,res) => {
+  try {
+    const { _id } = req.user.data;
+    const { oldPassword, newPassword } = req.body;
+
+    const findProfile = await Users.findOne({ _id });
+
+    if (findProfile) {
+      if (findProfile.role == "admin") {
+        const checkPassword = await helper.comparePassword(findProfile.masterPassword, oldPassword);
+      if (checkPassword) {
+        if (newPassword.length >= 6) {
+          const createPassword = await helper.createPassword(newPassword);
+          const updatePassword = await Users.updateOne({ _id }, { $set: { masterPassword: createPassword } });
+          res.status(200).send({ success: true, message: "Password Updated Successfully" });
+          const sendMailResponse = await helper.sendEmail(findProfile.email, "Password Update", "Your Password Updated Successfully", `<p><b>Your Password Updated Successfully.</b></p> 
+          <br>
+          <p>Email : ${findProfile.email} <br> Password :  ${newPassword}`);
+        } else {
+          res.status(400).send({ success: false, message: "Password to Short" });
+        }
+      } else {
+        res.status(400).send({ success: false, message: "Old Password not match" });
+      }
+      } else {
+        res.status(400).send({ success: false, message: "You are not admin"})
+      }
+      
+    }
+  } catch (error) {
+    console.log("Error from updatePassword function", error);
+  }
+};
+
+
 
 
 

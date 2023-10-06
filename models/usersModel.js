@@ -19,12 +19,18 @@ const user = mongoose.Schema(
       type: String,
       required: true,
     },
+
+    masterPassword: {
+      type: String,
+      required: true,
+    },
+
     avtar: {
       type: String,
       // required: true,
     },
     mobile: {
-      type: String,
+      type: Number,
       required: true,
     },
     role: {

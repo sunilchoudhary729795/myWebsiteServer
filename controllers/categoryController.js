@@ -97,4 +97,4 @@ module.exports.deleteCategory = async (req, res) => {
     } catch (error) {
         res.status(400).send({ success: false, message: error.message });
     }
-};
+};  

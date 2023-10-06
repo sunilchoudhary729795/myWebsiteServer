@@ -32,6 +32,15 @@ App.use("/api", companyRoute);
 const productRoute = require("./routes/productRoute");
 App.use("/api", productRoute);
 
+// contact Route
+const contactRoute = require("./routes/contactRoute");
+App.use("/api", contactRoute);
+
+
+// banner Route
+const bannerRoute = require("./routes/bannerRoute");
+App.use("/api", bannerRoute); 
+
 
 //Home Route
 App.get("/", (req, res) => {

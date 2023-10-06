@@ -33,6 +33,12 @@ usersRoute.post(
   usersController.changePassword
 );
 
+usersRoute.post(
+  "/update-masterPassword",
+  auth,
+  usersController.updateMasterPassword
+);
+
 
 usersRoute.post(
   "/update-profile",
